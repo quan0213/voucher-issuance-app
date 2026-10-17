@@ -24,7 +24,7 @@ public class CampaignService {
     }
 
     @Transactional(timeout = 5)
-    public Campaign create(CampaignController.CreateCampaign request) {
+    public Campaign create(CreateCampaignCommand request) {
         Instant now = clock.now();
         Instant starts = request.startsAt() == null ? now : request.startsAt();
         Instant ends = request.endsAt() == null ? starts.plus(Duration.ofDays(1)) : request.endsAt();

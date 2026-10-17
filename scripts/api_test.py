@@ -49,21 +49,24 @@ async def run(args):
                 if response_headers.get('transfer-encoding', '').lower() == 'chunked':
                     chunks = []
                     while True:
-                        size = int((await reader.readline()).split(b';', 1)[0].strip(), 16)
+                        size = int((await asyncio.wait_for(reader.readline(), timeout=45)).split(b';', 1)[0].strip(), 16)
                         if size == 0:
-                            await reader.readline()
+                            await asyncio.wait_for(reader.readline(), timeout=45)
                             break
-                        chunks.append(await reader.readexactly(size))
-                        await reader.readexactly(2)
+                        chunks.append(await asyncio.wait_for(reader.readexactly(size), timeout=45))
+                        await asyncio.wait_for(reader.readexactly(2), timeout=45)
                     data = b''.join(chunks)
                 elif 'content-length' in response_headers:
-                    data = await reader.readexactly(int(response_headers['content-length']))
+                    data = await asyncio.wait_for(reader.readexactly(int(response_headers['content-length'])), timeout=45)
                 else:
-                    data = await reader.read()
+                    data = await asyncio.wait_for(reader.read(), timeout=45)
                 return status, json.loads(data) if data else {}, time.perf_counter() - started
             finally:
                 writer.close()
-                await writer.wait_closed()
+                try:
+                    await writer.wait_closed()
+                except (ConnectionError, OSError):
+                    pass
 
     soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
     required = args.concurrency * 2 + 256
