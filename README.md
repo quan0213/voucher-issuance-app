@@ -233,3 +233,16 @@ Stop the API with Ctrl-C and run `docker compose down` to stop that database. It
 - **Pending claims:** check database-backed readiness and the allocation failure metrics. Accepted requests stay durable while a worker is stopped and are processed after it returns.
 
 Keep the repository private as required by the assignment. Local credentials, database files, logs, IDE files, and generated reports are ignored by Git.
+
+## Push the local repository to your GitHub account
+
+Create an empty **private** GitHub repository without generating another README. From this project's directory, replace `YOUR_GITHUB_USER` with your account name:
+
+```bash
+git remote add origin https://github.com/YOUR_GITHUB_USER/voucher-issuance-service.git
+git push -u origin main
+```
+
+The project is already initialized and committed, so another `git init` or initial commit is unnecessary. If a remote already exists, inspect `git remote -v` before changing it; do not overwrite an unrelated remote or force-push.
+
+Authenticate Git using your configured credential helper, an SSH key, or IntelliJ's GitHub integration. A browser sign-in alone does not authenticate command-line Git. If you use GitHub CLI, `gh auth login` followed by `gh auth setup-git` configures HTTPS credentials. No tokens or passwords belong in the source repository.
