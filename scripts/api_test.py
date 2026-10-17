@@ -88,16 +88,37 @@ async def run(args):
         users.append(user)
         scores.add(score)
 
+    attempt_counts = Counter()
+    retry_counts = Counter()
+
+    async def submit(user):
+        last_failure = None
+        for attempt in range(args.max_retries + 1):
+            try:
+                reply = await request('POST', '/api/v1/claims', {'campaignId': campaign_id, 'userId': user})
+                attempt_counts[str(reply[0])] += 1
+                if reply[0] not in (429, 503) or attempt == args.max_retries:
+                    return reply
+                retry_counts['HTTP_' + str(reply[0])] += 1
+            except (OSError, TimeoutError, asyncio.IncompleteReadError) as failure:
+                attempt_counts[type(failure).__name__] += 1
+                last_failure = failure
+                if attempt == args.max_retries:
+                    raise
+                retry_counts[type(failure).__name__] += 1
+            # Retrying the same natural key is safe after a lost or uncertain response.
+            await asyncio.sleep(0.2 * (2 ** attempt))
+        raise last_failure
+
     started = time.perf_counter()
-    admissions = await asyncio.gather(*(request('POST', '/api/v1/claims', {'campaignId': campaign_id, 'userId': user})
-                                        for user in users), return_exceptions=True)
+    admissions = await asyncio.gather(*(submit(user) for user in users), return_exceptions=True)
     admission_seconds = time.perf_counter() - started
     failures = [f'{type(reply).__name__}: {reply}' if isinstance(reply, Exception) else f'HTTP {reply[0]} {reply[1].get("code", "")}'
                 for reply in admissions if isinstance(reply, Exception) or reply[0] not in (200, 202)]
     http_counts = Counter('transport_error' if isinstance(reply, Exception) else str(reply[0]) for reply in admissions)
     if failures:
         breakdown = Counter(type(reply).__name__ for reply in admissions if isinstance(reply, Exception))
-        raise AssertionError(f'{len(failures)} admission failures; HTTP counts={dict(http_counts)}; transport errors={dict(breakdown)}; examples={failures[:3]}')
+        raise AssertionError(f'{len(failures)} final admission failures; HTTP counts={dict(http_counts)}; all attempts={dict(attempt_counts)}; transport errors={dict(breakdown)}; examples={failures[:3]}')
     ids = [reply[1]['requestId'] for reply in admissions]
     assert len(set(ids)) == args.users, 'Distinct users must have distinct request IDs.'
     batches = {reply[1]['batchId'] for reply in admissions}
@@ -135,6 +156,8 @@ async def run(args):
     report = {'result': 'PASS', 'users': args.users, 'maximumInFlight': args.concurrency,
               'capacity': args.capacity, 'windowMs': args.window_ms, 'cohorts': len(batches),
               'httpStatusCounts': dict(http_counts), 'issued': len(winners), 'rejected': args.users - len(winners),
+              'maximumRetries': args.max_retries, 'allAdmissionAttemptCounts': dict(attempt_counts),
+              'retriedAdmissionAttemptCounts': dict(retry_counts),
               'admissionSeconds': round(admission_seconds, 3), 'admissionHttpMs': {
                   'p50': percentile(.5), 'p95': percentile(.95), 'p99': percentile(.99)},
               'totalSeconds': round(time.perf_counter() - started, 3),
@@ -152,10 +175,13 @@ if __name__ == '__main__':
     parser.add_argument('--concurrency', type=int, default=20)
     parser.add_argument('--window-ms', type=int, default=5000)
     parser.add_argument('--check-priority', action='store_true')
+    parser.add_argument('--max-retries', type=int, default=3)
     parser.add_argument('--base-url')
     arguments = parser.parse_args()
     if arguments.users < 1 or arguments.capacity < 1 or arguments.concurrency < 1:
         parser.error('users, capacity, and concurrency must be positive')
+    if arguments.max_retries < 0:
+        parser.error('max-retries cannot be negative')
     try:
         asyncio.run(run(arguments))
     except (AssertionError, RuntimeError, ValueError, OSError) as failure:

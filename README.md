@@ -195,7 +195,9 @@ The suite uses real HTTP ports, real PostgreSQL 17.11, and no mocked service or 
 
 Configuration tests verify that invalid window and chunk settings prevent startup. Tests configure known loyalty fixtures and assert that priority candidates share one batch; a client-side simultaneous send alone cannot prove that condition.
 
-The live test exits nonzero for HTTP errors, transport failures, duplicate vouchers, an incorrect issued count, incorrect same-cohort winners, or broken replay. Load reports include all admission status counts, latency, elapsed time, and cohort counts. Admission HTTP timings exclude the client's semaphore wait when concurrency is lower than total users. Correctness passing does not imply a latency target has been achieved.
+The live client retries transient connection failures and retryable `429` or `503` responses up to three times using the same user and campaign. Set `--max-retries 0` on `scripts/api_test.py` for a run without retries. It exits nonzero for an unrecovered request failure, duplicate vouchers, an incorrect issued count, incorrect same-cohort winners, or broken replay.
+
+Load reports include final admission status counts, all attempt status/error counts, retried attempt counts, latency, elapsed time, and cohort counts. Admission HTTP percentiles describe the final successful attempts and exclude the client's semaphore wait and retry backoff; total admission duration includes the retries. Correctness passing does not imply a latency target has been achieved.
 
 Reports:
 
