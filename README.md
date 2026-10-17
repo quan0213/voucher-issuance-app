@@ -243,6 +243,6 @@ git remote add origin https://github.com/YOUR_GITHUB_USER/voucher-issuance-servi
 git push -u origin main
 ```
 
-The project is already initialized and committed, so another `git init` or initial commit is unnecessary. If a remote already exists, inspect `git remote -v` before changing it; do not overwrite an unrelated remote or force-push.
+The local project directory is already initialized and committed, so another `git init` or initial commit is unnecessary there. The downloadable source ZIP excludes Git metadata; if using that ZIP, run `git init -b main`, `git add .`, and `git commit -m "Initial version"` before adding the remote. If a remote already exists, inspect `git remote -v` before changing it; do not overwrite an unrelated remote or force-push.
 
 Authenticate Git using your configured credential helper, an SSH key, or IntelliJ's GitHub integration. A browser sign-in alone does not authenticate command-line Git. If you use GitHub CLI, `gh auth login` followed by `gh auth setup-git` configures HTTPS credentials. No tokens or passwords belong in the source repository.
