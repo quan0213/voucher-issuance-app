@@ -6,3 +6,4 @@ target/
 .env
 *.log
 __pycache__/
+http-client.private.env.json

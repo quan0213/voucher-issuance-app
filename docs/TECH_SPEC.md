@@ -48,8 +48,8 @@ Controllers handle HTTP validation and response mapping. Services own business r
 | Schema changes | Flyway |
 | API validation and administration | Jakarta Validation and Spring Security |
 | Operations | Spring Boot Actuator and Micrometer |
-| Tests | JUnit 5, Spring Boot Test, and Testcontainers with PostgreSQL |
-| Local environment | Docker Compose |
+| Tests | JUnit 5 and Spring Boot Test over HTTP with isolated native PostgreSQL 17.11 via Zonky |
+| Local environment | Managed native PostgreSQL with Makefile scripts; Docker Compose is optional |
 
 Spring Boot 3.5 supports Java 17. Keep the implementation on the required 3.x line and pin dependency and container versions when adding the build. See [Spring Boot system requirements](https://docs.spring.io/spring-boot/3.5/system-requirements.html).
 
@@ -375,7 +375,7 @@ Complete these steps in order. Keep each step runnable and reviewable before sta
 
 ### Step 1 Bootstrap the application
 
-Add `pom.xml`, Maven Wrapper, the Spring Boot entry point, Docker Compose for PostgreSQL, and an environment example. Extend the provided batching configuration in `application.yml` with database and operational settings. Bind and validate both window duration and processing chunk size. Include web, validation, JDBC, security, Flyway PostgreSQL support, Actuator, and test dependencies. Pin versions without overriding the Spring BOM unnecessarily.
+Add `pom.xml`, Maven Wrapper, the Spring Boot entry point, managed local PostgreSQL scripts, optional Docker Compose, and generated ignored local configuration. Extend the provided batching configuration in `application.yml` with database and operational settings. Bind and validate both window duration and processing chunk size. Include web, validation, JDBC, security, Flyway PostgreSQL support, Actuator, and test dependencies. Pin versions without overriding the Spring BOM unnecessarily.
 
 Use the existing package directories under `com.aepsy.voucher`. Configure secrets through environment variables. Create local, test, and load-test settings as needed without embedding passwords intended for deployment.
 
@@ -385,7 +385,7 @@ Use the existing package directories under `com.aepsy.voucher`. Configure secret
 
 Create the first Flyway migration for all four tables, constraints, and indexes. Add explicit repository methods for campaign creation, committed batch lookup, batch creation, shared admission locking, ordered candidate selection, and bulk updates. Add DB time access used by the protocol.
 
-**Completion:** migrations run on an empty PostgreSQL container and a second startup succeeds without schema changes. Integration tests verify uniqueness, composite references, and capacity checks. Do not use H2 to validate locking behavior.
+**Completion:** migrations run on an empty isolated PostgreSQL instance and a second startup succeeds without schema changes. Integration tests verify uniqueness, composite references, and capacity checks against real PostgreSQL. The native PostgreSQL launcher removes the Docker prerequisite; do not use H2 to validate locking behavior.
 
 ### Step 3 Implement campaign APIs and mocked loyalty
 

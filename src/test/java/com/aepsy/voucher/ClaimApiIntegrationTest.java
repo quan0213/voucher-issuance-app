@@ -8,6 +8,9 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
@@ -40,6 +43,7 @@ import static org.awaitility.Awaitility.await;
 class ClaimApiIntegrationTest {
     @LocalServerPort int port;
     @Autowired ObjectMapper mapper;
+    @Autowired JdbcTemplate jdbc;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
 
     @DynamicPropertySource
@@ -195,6 +199,77 @@ class ClaimApiIntegrationTest {
         assertThat(later.path("status").asText()).isEqualTo("REJECTED");
     }
 
+    @Test
+    void campaignCannotAcceptClaimsBeforeItsStart() throws Exception {
+        Reply created = adminCampaign(Map.of("code", code(), "capacity", 1,
+                "startsAt", Instant.now().plusSeconds(60).toString()));
+        assertThat(created.status()).isEqualTo(201);
+        Reply early = claim(created.body().path("id").asText(), "too-early");
+        assertThat(early.status()).isEqualTo(409);
+        assertThat(early.body().path("code").asText()).isEqualTo("CAMPAIGN_NOT_STARTED");
+    }
+
+    @Test
+    void failureAfterAnIntermediateChunkRollsBackWholeWindowAndRecovers() throws Exception {
+        String campaign = campaign(5, 3000);
+        String function = "test_fail_" + UUID.randomUUID().toString().replace("-", "");
+        String trigger = function + "_trigger";
+        double failuresBefore = send("GET", "/actuator/metrics/voucher.allocation.failures", null, true)
+                .body().path("measurements").path(0).path("value").asDouble(0);
+        jdbc.execute("""
+                CREATE FUNCTION %s() RETURNS trigger LANGUAGE plpgsql AS $$
+                BEGIN
+                    IF NEW.campaign_id = '%s'::uuid AND
+                        (SELECT count(*) FROM voucher WHERE campaign_id = NEW.campaign_id) >= 2 THEN
+                        RAISE EXCEPTION 'injected failure after first processing chunk';
+                    END IF;
+                    RETURN NEW;
+                END $$
+                """.formatted(function, campaign));
+        jdbc.execute("CREATE TRIGGER " + trigger + " BEFORE INSERT ON voucher FOR EACH ROW EXECUTE FUNCTION " + function + "()");
+        List<Reply> admissions;
+        try {
+            admissions = concurrent(20, n -> () -> claim(campaign, "priority-" + (n + 1)));
+            assertThat(admissions.stream().map(r -> r.body().path("batchId").asText()).distinct()).hasSize(1);
+            await().atMost(Duration.ofSeconds(12)).untilAsserted(() -> {
+                double failuresNow = send("GET", "/actuator/metrics/voucher.allocation.failures", null, true)
+                        .body().path("measurements").path(0).path("value").asDouble();
+                assertThat(failuresNow).isGreaterThan(failuresBefore);
+            });
+            assertThat(inventory(campaign)).isZero();
+            for (Reply admission : admissions) assertThat(result(admission).path("status").asText()).isEqualTo("PENDING");
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM voucher WHERE campaign_id = ?", Integer.class, UUID.fromString(campaign))).isZero();
+        } finally {
+            jdbc.execute("DROP TRIGGER IF EXISTS " + trigger + " ON voucher");
+            jdbc.execute("DROP FUNCTION IF EXISTS " + function + "()");
+        }
+        List<JsonNode> results = finished(admissions);
+        for (int i = 0; i < results.size(); i++) {
+            assertThat(results.get(i).path("status").asText()).isEqualTo(i >= 15 ? "ISSUED" : "REJECTED");
+        }
+        assertThat(inventory(campaign)).isEqualTo(5);
+    }
+
+    @Test
+    void twoApplicationInstancesShareInventoryAndIdempotency() throws Exception {
+        try (var second = new SpringApplicationBuilder(VoucherApplication.class).run(
+                "--server.port=0", "--spring.datasource.url=" + TestDatabase.url(),
+                "--spring.datasource.username=postgres", "--spring.datasource.password=postgres",
+                "--voucher.admin.username=test-admin", "--voucher.admin.password=test-only-password",
+                "--voucher.batching.processing-chunk-size=1", "--voucher.allocation.scan-interval-ms=40")) {
+            int otherPort = ((ServletWebServerApplicationContext) second).getWebServer().getPort();
+            String campaign = campaign(7, 1000);
+            List<Reply> submissions = concurrent(80, n -> () -> sendAt(n % 2 == 0 ? port : otherPort,
+                    "POST", "/api/v1/claims", Map.of("campaignId", campaign, "userId", "cross-instance-" + (n % 20)), false));
+            for (Reply reply : submissions) assertThat(reply.status()).isIn(200, 202);
+            assertThat(submissions.stream().map(r -> r.body().path("requestId").asText()).distinct()).hasSize(20);
+            List<JsonNode> results = finished(submissions);
+            assertThat(results.stream().filter(n -> n.path("status").asText().equals("ISSUED"))
+                    .map(n -> n.path("voucherCode").asText()).distinct()).hasSize(7);
+            assertThat(inventory(campaign)).isEqualTo(7);
+        }
+    }
+
     private String campaign(int capacity, int windowMs) throws Exception {
         Reply reply = adminCampaign(Map.of("code", code(), "capacity", capacity, "batchWindowMs", windowMs));
         assertThat(reply.status()).isEqualTo(201);
@@ -238,7 +313,11 @@ class ClaimApiIntegrationTest {
     }
 
     private Reply send(String method, String path, Object body, boolean admin) throws Exception {
-        HttpRequest.Builder request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + path))
+        return sendAt(port, method, path, body, admin);
+    }
+
+    private Reply sendAt(int targetPort, String method, String path, Object body, boolean admin) throws Exception {
+        HttpRequest.Builder request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + targetPort + path))
                 .timeout(Duration.ofSeconds(15)).header("Content-Type", "application/json");
         if (admin) request.header("Authorization", "Basic " + Base64.getEncoder().encodeToString(
                 "test-admin:test-only-password".getBytes(StandardCharsets.UTF_8)));

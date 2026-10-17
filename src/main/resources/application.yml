@@ -1,0 +1,49 @@
+spring:
+  application:
+    name: voucher-issuance-service
+  config:
+    import: optional:file:.local/application-local.properties
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://127.0.0.1:55432/vouchers?reWriteBatchedInserts=true}
+    username: ${DATABASE_USERNAME:postgres}
+    password: ${DATABASE_PASSWORD:postgres}
+    hikari:
+      maximum-pool-size: ${DATABASE_POOL_SIZE:24}
+      connection-timeout: 2000
+  jackson:
+    default-property-inclusion: non_null
+    deserialization:
+      fail-on-unknown-properties: true
+server:
+  port: ${PORT:8080}
+  address: ${SERVER_ADDRESS:127.0.0.1}
+  shutdown: graceful
+  tomcat:
+    threads:
+      max: 300
+      min-spare: 20
+    accept-count: 10000
+    max-connections: 10000
+voucher:
+  admin:
+    username: ${VOUCHER_ADMIN_USERNAME:admin}
+    password: ${VOUCHER_ADMIN_PASSWORD:}
+  batching:
+    window-ms: ${VOUCHER_BATCH_WINDOW_MS:500}
+    processing-chunk-size: ${VOUCHER_BATCH_PROCESSING_CHUNK_SIZE:500}
+  allocation:
+    enabled: true
+    scan-interval-ms: ${VOUCHER_ALLOCATION_SCAN_INTERVAL_MS:100}
+    workers: ${VOUCHER_ALLOCATION_WORKERS:2}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db

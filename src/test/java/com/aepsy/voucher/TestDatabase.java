@@ -12,8 +12,10 @@ final class TestDatabase {
     private static EmbeddedPostgres start() {
         try {
             EmbeddedPostgres postgres = EmbeddedPostgres.builder()
+                    .setLocaleConfig("locale", "C")
                     .setServerConfig("listen_addresses", "127.0.0.1")
                     .setServerConfig("max_connections", "100")
+                    .setServerConfig("fsync", "on")
                     .setPort(0).start();
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 try { postgres.close(); } catch (Exception ignored) { }
@@ -25,7 +27,7 @@ final class TestDatabase {
     }
 
     static void configure(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", () -> "jdbc:postgresql://127.0.0.1:" + POSTGRES.getPort() + "/postgres");
+        registry.add("spring.datasource.url", TestDatabase::url);
         registry.add("spring.datasource.username", () -> "postgres");
         registry.add("spring.datasource.password", () -> "postgres");
         registry.add("voucher.admin.username", () -> "test-admin");
@@ -35,4 +37,6 @@ final class TestDatabase {
             registry.add("voucher.loyalty.points.priority-" + n, () -> score);
         }
     }
+
+    static String url() { return "jdbc:postgresql://127.0.0.1:" + POSTGRES.getPort() + "/postgres"; }
 }

@@ -1,0 +1,23 @@
+### Create a campaign with the default collection window
+POST {{baseUrl}}/api/v1/admin/campaigns
+Authorization: Basic {{adminUsername}} {{adminPassword}}
+Content-Type: application/json
+
+{"code":"MANUAL_{{$timestamp}}","capacity":5}
+
+> {% client.global.set("campaignId", response.body.id); %}
+
+### Submit a claim
+POST {{baseUrl}}/api/v1/claims
+Content-Type: application/json
+
+{"campaignId":"{{campaignId}}","userId":"manual-user"}
+
+> {% client.global.set("requestId", response.body.requestId); %}
+
+### Poll the claim after the collection window closes
+GET {{baseUrl}}/api/v1/claims/{{requestId}}
+
+### Inspect inventory
+GET {{baseUrl}}/api/v1/admin/campaigns/{{campaignId}}
+Authorization: Basic {{adminUsername}} {{adminPassword}}
