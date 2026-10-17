@@ -75,6 +75,6 @@ VOUCHER_BATCH_WINDOW_MS=1000 VOUCHER_BATCH_PROCESSING_CHUNK_SIZE=100 make up
 
 ## Further reading
 
-- [Architecture](ARCHITECTURE.md): request flow, priority rules, database guarantees, and tradeoffs.
+- [Architecture](ARCHITECTURE.md): sequence diagrams, batch queries, priority rules, and concurrency guarantees.
 - [Verification results](VERIFICATION.md): 24 passing tests and measured load results, including latency limits.
 - [Detailed specification](TECH_SPEC.md): API contracts, locking protocol, and implementation plan.
