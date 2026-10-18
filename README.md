@@ -55,7 +55,7 @@ If the background app is running, use `make down` before step 2 to free port 808
 
 A new claim returns **202 Accepted** with a `requestId`. Poll that request until it becomes `ISSUED` with a `voucherCode`, or `REJECTED` with `reason: SOLD_OUT`. Repeating the same user and campaign returns the original request; a completed replay returns **200**.
 
-Run `make smoke` for an automatic API walkthrough, or use [api.http](api.http) with the `local` environment in a compatible editor HTTP client. Setup generates its private credentials file. Admin endpoints use HTTP Basic authentication; credentials are also in `.local/settings.json`. User identity and loyalty are mocked for this assignment.
+Follow [API examples](API_EXAMPLES.md) for copy-and-paste requests and actual responses. Run `make smoke` for an automatic API test, or use [api.http](api.http) with the `local` environment in a compatible editor HTTP client. Setup generates its private credentials file. Admin endpoints use HTTP Basic authentication; credentials are also in `.local/settings.json`. User identity and loyalty are mocked for this assignment.
 
 ## Batch configuration
 
@@ -76,5 +76,7 @@ VOUCHER_BATCH_WINDOW_MS=1000 VOUCHER_BATCH_PROCESSING_CHUNK_SIZE=100 make up
 ## Further reading
 
 - [Architecture](ARCHITECTURE.md): sequence diagrams, batch queries, priority rules, and concurrency guarantees.
+- [API examples](API_EXAMPLES.md): a runnable guide to each endpoint, with verified request and response examples.
+- [Code structure](CODE_STRUCTURE.md): package layout, responsibilities, coding conventions, and reviewer starting points.
 - [Verification results](VERIFICATION.md): 24 passing tests and measured load results, including latency limits.
 - [Detailed specification](TECH_SPEC.md): API contracts, locking protocol, and implementation plan.

@@ -37,3 +37,9 @@ Generated machine-readable reports are written under `target/reports/` and are i
 The documented `make verify` workflow passed from a separate clone with no pre-existing `target` directory, local settings, credentials, or development database files. It used the ARM64 Java 17 runtime and alternate local ports 18080 and 55433 so it could run independently of the main checkout.
 
 That workflow prepared dependencies, passed all 24 tests, initialized a new development database, built and started the API, waited for readiness, and passed the 20-user live priority and replay test. All 20 requests were accepted into one cohort, exactly five won, and no retry was needed. Admission HTTP p95 for this smoke test was 69.98 ms. The scratch clone's processes were stopped after verification.
+
+## API examples walkthrough
+
+On October 18, 2026, all nine HTTP examples in [API examples](API_EXAMPLES.md) passed against the running local application: readiness, campaign creation, first admission, issued result polling, completed replay, a second admission, sold-out result polling, inventory inspection, and invalid input. Expected HTTP statuses were `200`, `201`, `202`, `200`, `200`, `202`, `200`, `200`, and `400`, respectively. The response bodies in that guide were captured from the successful run.
+
+All 11 Bash command blocks in the guide also ran together in Zsh, preserving shell variables between steps. Bash syntax checks passed, and the individual API examples were executed through Bash as well. The final `make smoke` accepted all 20 users into one window, issued exactly five unique vouchers to the highest loyalty scores, rejected 15 users, and completed without retries. Machine-readable results are generated under `target/reports/api-examples.json` and `target/reports/api-20.json`.

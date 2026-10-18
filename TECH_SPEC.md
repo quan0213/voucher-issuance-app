@@ -308,8 +308,10 @@ For the initial implementation, new requests submitted while the campaign is act
 ```json
 {
   "requestId": "5aac0e20-094a-419c-a383-d71b328da50f",
+  "campaignId": "8ae64d72-3e0e-4ae6-a095-62fef045690b",
+  "batchId": "1c8894ac-8f04-48c8-8dea-f9387d599e60",
   "status": "ISSUED",
-  "voucherCode": "MH-8f21884b817844919cff849f0bf9a18d"
+  "voucherCode": "VC-8f21884b817844919cff849f0bf9a18d"
 }
 ```
 
